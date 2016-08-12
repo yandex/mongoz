@@ -1,0 +1,222 @@
+.TH MONGOZ 8 @@DATE@@
+.SH NAME
+mongoz \- an alternative implementation of MongoDB sharding server
+
+.SH SYNOPSIS
+.B mongoz
+\fB\-\-listen\fR [\fIhost\fR:]\fIport\fR
+\fB\-\-config-servers\fR \fIserver1\fR[,\fIserver2\fR,...]
+[\fIoptions\fR...]
+
+.SH OPTIONS
+.TP
+.BR \-l ", " \-\-listen =[\fIHOST\fR:]\fIPORT\fR
+Listen on the specified address. Address may be in one of the following formats:
+\fI127.0.0.1:1234\fR, \fI[::1]:1234\fR, \fIlocalhost:1234\fR or just \fI1234\fR.
+In the latter case mongoz will listen on all interface and all address families.
+Please note that IPv6 addresses have IPV6_V6ONLY option enabled, so "[::]:27017" address
+won't make mongoz listen on IPv4 address family. In most of the cases, "-l 27017"
+is just fine. This option may be specified more than once if you need
+to accept connections on different address families or interfaces.
+
+.TP
+.BR \-c ", " \-\-config\-servers =\fIHOST\fR:\fIPORT\fR[,\fIHOST\fR:\fIPORT\fR,...]
+Use the specified config server. Please note that you must use the same
+config server set listed \fIin the same order\fR and the same notation for all mongoz
+and mongos instances within the whole shard set (e.g. "localhost:27019",
+"127.0.0.1:27019", "[::1]:27019" and "[::ffff:127.0.0.1]:27019" are four
+different config servers, incompatible with each other).
+
+Warning: due to internal MongoDB limitations, mismatched config servers
+in two different mongoz/mongos instances will likely \fBrender the whole
+cluster unusable\fR.
+
+.TP
+.BR \-C ", " \-\-config\-cache =\fIFILE\fR
+Cache the fetched sharding configuration and auth info in the specified file.
+When mongoz starts, it will try to use the configuration stored in the cache
+and thus can handle particular requests even if no config servers are available
+(those have to be queries to nonprimary nodes).
+
+.TP
+.BR \-v ", " \-\-verbose
+Increase verbosity. This option can be specified more than once.
+
+.TP
+.BR \-L ", " \-\-log =\fIFILE\fR
+Write server logs to the specified file.
+
+.TP
+.BR \-S ", " \-\-log =\fIIDENT\fR
+Send logs to syslog(8) with the specified identifier.
+
+.TP
+.BR \-d ", " \-\-daemonize =\fIPIDFILE\fR
+Fork to background and write background process identifier to the specified file.
+
+.TP
+.BR \-\-auth
+Require client authentication and enable access rights control. Please note
+that unlike mongos, once authentication has been enabled, unauthenticated
+access even from localhost is forbidden. On the other hand, if authentication
+is disabled, all authentication attempts (if any) will unconditionally succeed.
+
+.TP
+.BR \-\-key\-file =\fIFILE\fR
+Use contents of the specified file as the shared secret for communication
+between mongoz, config mongod and backend mongod. \fB\-\-key\-file\fR
+and \fB\-\-auth\fR
+are completely independent options; you can specify just the former one
+if you don't need any client authentication but want to make sure
+all traffic to shard mongod goes through mongoz.
+
+.TP
+.BR \-\-read\-only
+Forbid all write operations (inserts, updates, and deletes) through
+this server.
+
+.TP
+.BR \-\-local\-threshold =\fIDURATION\fR
+Mongoz constantly pings backend servers and remembers their roundtrip time.
+When selecting a node for read operation with \fBnearest\fR read preference,
+mongoz will select a random node among those whose roundtrip time
+does not exceed minimal within a replica set plus \fIduration\fR.
+
+.TP
+.BR \-\-max\-repl\-lag =\fIDURATION\fR
+When selecting a node for read operation with \fBnearest\fR read preference,
+ignore all replicas whose replication lag exceeds \fIduration\fR.
+Additionally, report such replicas to a monitoring script.
+
+.TP
+.BR \-\-read\-timeout =\fIDURATION\fR
+If a read operations lasts longer than \fIduration\fR, it will fail
+and a timeout error will be reported to the client.
+
+.TP
+.BR \-\-read\-retransmit =\fIDURATION\fR
+If a read operation lasts longer than \fIduration\fR and there exists another
+backend node capable of handling the request, mongoz will retransmit
+the query to that node and return the result from the backend which completes
+first.
+
+.TP
+.BR \-\-write\-timeout =\fIDURATION\fR
+If a write operation (insert, update or delete) lasts longer than
+\fIduration\fR, it will fail and a timeout error will be reported
+to the client. Please note that timed out writes may lead to inconsistency
+of the database, so it is advised to make write timeouts relatively big.
+In particular, if a replica set loses its master, mongoz will try to wait
+until the new master is elected and then retry the write.
+Since usual election process may last a few minutes, write timeout
+normally should not be less than 5 min.
+
+.TP
+.BR \-\-write\-retransmit =\fIDURATION\fR
+If a write operation lasts longer than \fIduration\fR, it will be re-executed
+again. Since re-execution of partially-completed operation may lead to database
+inconsistency, this interval should be enough for any write operation to complete.
+
+.TP
+.BR \-\-ping\-interval =\fIDURATION\fR
+If a node responds to a ping and seems alive and capable of handling
+requests, schedule its next ping in \fIduration\fR. Actual ping may occur
+sooner if the node seems to go offline while handling a request.
+
+.TP
+.BR \-\-ping\-fail\-interval =\fIDURATION\fR
+If a node did not respond to a ping, schedule its next ping in
+\fIduration\fR.
+
+.TP
+.BR \-\-ping\-timeout =\fIDURATION\fR
+If a node fails to respond to keepalive checks in \fIduration\fR, consider
+it offline. Note that mongoz will issue several check commands (ping,
+replSetGetStatus, isMaster, etc) and node must reply to all
+of them within \fIduration\fR. Actual time elapsed is reported as
+"gross roundtrip" in mongoz logs, while time before the first reply
+is reported as "net timeout" and considered when choosing a replica
+for \fInearest\fR read preference.
+
+.TP
+.BR \-\-conf\-timeout =\fIDURATION\fR
+When pulling shard configuration or user list, wait for data at most
+\fIduration\fR and then fail.
+
+.TP
+.BR \-\-conf\-retransmit =\fIDURATION\fR
+When pulling shard configuration or user list, if the server
+does not respond in \fIduration\fR, retransmit the request to another
+config server and use the reply from the one which responds first.
+
+.TP
+.BR \-\-conf\-interval =\fIDURATION\fR
+After pulling shard configuration, schedule the next config update
+in \fIduration\fR. Actual update may take place sooner, if a request
+to a backend server results in "shard config stale" error.
+
+.TP
+.BR \-\-monitor\-no\-primary =\fIDURATION\fR
+If a replica set cannot elect a primary node for \fIduration\fR,
+issue a critical event to a monitoring script. Before that, issue a warning.
+
+.TP
+.BR \-\-monitor\-config\-age =\fIDURATION\fR
+If the last config update occured more than \fIduration\fR ago,
+issue a critical event to a monitoring script.
+
+.TP
+.BR \-\-conn\-pool\-size =\fIN\fR
+Maintain a pool of \fIn\fR persistent connections to each backend server.
+
+.TP
+.BR \-\-threads =\fIN\fR
+Spawn \fIn\fR parallel threads.
+
+.TP
+.BR \-\-global\-cursors
+Allow cursor ID sharing between different connections to mongoz.
+This can help deal with broken client drivers (like Java driver)
+which create a pool of connections to mongoz but fail to track
+cursor affilation, resulting in mysterious `cursor not found'
+error messages.
+
+.PP
+All durations are specified in format \fI1234ms\fR, where suffix can
+be one of \fBmin\fR (minutes), \fBs\fR (seconds), \fBms\fR (milliseconds)
+or \fBus\fR (microseconds).
+
+.SH LIMITATIONS
+Mongoz's scope is limited to handling usual CRUD-like requests
+from applications aiming at high availability and thus lacks several features
+compared to stock mongos. In particular:
+
+.IP " * " 4
+Mongoz cannot create new databases nor collections (attempt to write
+to a nonexistent collection will result in an error).
+
+.IP " * " 4
+Mongoz lacks balancer and does not move chunks between shards. Run
+a separate instance of mongos if you need to.
+
+.IP " * " 4
+Mongoz does not support database commands except \fBgetLastError\fR,
+authentication-related ones (\fBgetnonce\fR and \fBauth\fR) and
+mongodb-2.6 write commands (\fBupdate\fR, \fBinsert\fR, \fBdelete\fR
+and \fBfindAndModify\fR).
+
+.IP " * " 4
+In particular, mongoz supports neither aggregation framework
+nor MapReduce operations.
+
+.IP " * " 4
+Mongoz does not distinguish \fBsecondary\fR, \fBsecondaryPreferred\fR
+and \fBnearest\fR read preferences (all of those are treated as
+\fBnearest\fR).
+
+.IP " * " 4
+Mongoz does not support zero write concern. All write operations
+get acknowledged from backend servers.
+
+.SH AUTHOR
+Mongoz and its manual page were written by Dmitry Prokoptsev <dprokoptsev@yandex-team.ru>.
