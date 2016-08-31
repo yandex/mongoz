@@ -253,6 +253,9 @@ std::vector<Config::VersionedShard> Config::shards(const Namespace& ns) const
 {
     std::map<std::shared_ptr<Shard>, ChunkVersion> map;
     
+    if (ns.db() == "config")
+        return {{ configShard_, ChunkVersion() }};
+
     const Collection* c = collection(ns);
 
     if (c) {
