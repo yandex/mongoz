@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([mongoz], [0.1.0], [dprokoptsev@yandex-team.ru])
+AC_INIT([mongoz], [0.1.1], [dprokoptsev@yandex-team.ru])
 AM_INIT_AUTOMAKE([foreign -Wall])
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([config.h])
