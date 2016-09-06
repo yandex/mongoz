@@ -69,6 +69,15 @@ void Connection::establish(const Namespace& ns, const ChunkVersion& v, const cha
         throw io::error("cannot communicate with backend");
 }
 
+void Connection::stepDown(std::chrono::seconds duration)
+{
+    stream() << QueryComposer(Namespace("admin", "$cmd"), bson::object(
+        "replSetStepDown", duration.count(),
+        "force", true
+    )).batchSize(1) << std::flush;
+    readReply(stream(), 0);
+}
+
 void Connection::authenticate()
 {
     auto cmdOk = [](const bson::Object& ret) -> bool {
@@ -146,6 +155,11 @@ void Connection::trySetVersion(const Namespace& ns, const ChunkVersion& v)
         } else if (errmsg.find(":: 8002 all servers down") != std::string::npos) {
             DEBUG(1) << "mongod went crazy, will retry";
             continue;
+        } else if (errmsg.find("sharding metadata manager failed to initialize") != std::string::npos) {
+            ERROR() << backend().addr() << " permanently incapable of operating as master";
+            backend().permanentlyFailed(errmsg);
+            stepDown(3600_s);
+            throw errors::PermanentFailure(errmsg);
         } else {
             throw errors::ShardConfigStale(errmsg);
         }
@@ -238,6 +252,7 @@ bool Endpoint::pingNow()
     static const uint32_t REQ_ID = 0x474E4950; // "PING"    
     std::vector<Shard::PingQuery> queries = (backend_->shard_ ? backend_->shard_->pingQueries() : std::vector<Shard::PingQuery>{});
     queries.emplace_back(Shard::PingQuery { "build_info", Namespace("local", "$cmd"), bson::object("buildinfo", 1) });
+    queries.emplace_back(Shard::PingQuery { "server_status", Namespace("admin", "$cmd"), bson::object("serverStatus", 1) });
     
     DEBUG(1) << "Pinging " << backend_->addr() << " on " << addr_;
     io::task<void> t = io::spawn([this, &queries]() {
@@ -297,8 +312,15 @@ void Endpoint::keepPing()
 
 void Backend::endpointAlive(Endpoint* pt, bson::Object status)
 {
+    auto pid = [](const bson::Object& status) -> unsigned {
+        auto elt = status["pid"];
+        return elt.exists() && elt.canBe<unsigned>() ? elt.as<unsigned>() : 0;
+    };
+
     {
         std::unique_lock<io::sys::shared_mutex> lock(mutex_);
+        if (pid(status_) != pid(status))
+            permanentErrmsg_.clear();
         status_ = std::move(status);
     }
 
@@ -341,6 +363,12 @@ void Backend::failed()
     }
     for (const auto& endpt: endpts_)
         endpt->failed();
+}
+
+void Backend::permanentlyFailed(const std::string& errmsg)
+{
+    std::unique_lock<io::sys::shared_mutex> lock(mutex_);
+    permanentErrmsg_ = errmsg;
 }
 
 void Backend::pingNow()

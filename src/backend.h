@@ -93,6 +93,7 @@ private:
     
     void authenticate();
     void trySetVersion(const Namespace& ns, const ChunkVersion& v);
+    void stepDown(std::chrono::seconds duration);
     
     friend class Endpoint;
 };
@@ -184,7 +185,13 @@ public:
         io::shared_lock<io::sys::shared_mutex> lock(mutex_);
         return status_;
     }
-    
+
+    std::string permanentErrmsg() const
+    {
+        io::shared_lock<io::sys::shared_mutex> lock(mutex_);
+        return permanentErrmsg_;
+    }
+
     std::chrono::microseconds roundtrip() const { return nearest_.get().value()->roundtrip(); }
     bool alive() const { return !status().empty() && nearest_.get().value()->alive(); }
     
@@ -193,6 +200,7 @@ public:
     const std::vector< std::unique_ptr<Endpoint> >& endpoints() const { return endpts_; }
     
     void failed();
+    void permanentlyFailed(const std::string& errmsg);
     
     void pingNow();
     
@@ -229,6 +237,7 @@ private:
     bson::Object status_;
     std::vector<EndptPtr> endpts_;
     Lazy<Endpoint*> nearest_;
+    std::string permanentErrmsg_;
     mutable io::sys::shared_mutex mutex_;
     
     void endpointAlive(Endpoint* pt, bson::Object status);

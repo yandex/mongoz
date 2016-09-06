@@ -192,7 +192,6 @@ private /*fields*/:
     std::string connstr_;
     std::shared_ptr<Shard> configShard_;
     std::string cache_;
-    std::vector< std::unique_ptr<Backend> > servers_;
     std::shared_ptr<Config> config_;
     io::sys::mutex mutex_;
     io::task<void> updater_;

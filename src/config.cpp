@@ -413,51 +413,44 @@ bson::Object readconf(io::stream& stream)
 
 bson::Object ConfigHolder::fetchConfig()
 {
-    std::vector<size_t> serverIdxs;
-    for (size_t i = 0; i != servers_.size(); ++i)
-        serverIdxs.push_back(i);
-    
-    auto pickServer = [this, &serverIdxs]() -> Backend* {
-        auto i = std::min_element(serverIdxs.begin(), serverIdxs.end(),
-            [this](size_t a, size_t b) { return servers_[a]->roundtrip() < servers_[b]->roundtrip(); });
-        assert(i != serverIdxs.end());
-        
-        Backend* ret = servers_[*i].get();
-        *i = serverIdxs[serverIdxs.size()-1];
-        serverIdxs.pop_back();
-        return ret;
-    };
-    
     io::task<bson::Object> task1, task2;
+    Backend* exclude = 0;
     
-    auto runFetch = [pickServer]() {
-        Backend* server = pickServer();
-        DEBUG(2) << "Using config server " << server->addr();
-        io::task<bson::Object> task = io::spawn([server]() -> bson::Object {
-            Endpoint* endpt = server->endpoint();
-            Connection c = endpt->getAny();
+    static const bson::Object READ_PREFERENCE = bson::object("mode", "primaryPreferred");
+    static const uint32_t QUERY_FLAGS = messages::Query::SLAVE_OK;
+    
+    auto pickBackend = [this, &exclude]() -> Connection {
+        Connection c = configShard_->readOp(QUERY_FLAGS, READ_PREFERENCE, exclude);
+        DEBUG(2) << "Using config server " << c.backend().addr();
+        exclude = &c.backend();
+        return c;
+    };
+
+    auto runFetch = [this, &exclude](Connection c) {
+        return io::spawn([](Connection c) -> bson::Object {
             c.establish(Namespace(), ChunkVersion(), QueryComposer(Namespace("local", "$cmd"), bson::object("ping", 1)));
             readReply(c.stream(), 0, [](const bson::Object&){});
             bson::Object ret = readconf(c.stream());
             c.release();
             return ret;
-        });
-        task.rename("fetch config from " + server->addr());
-        return std::move(task);
+        }, std::move(c));
     };
     
     io::timeout retransmit = options().confRetransmit;
     io::timeout timeout = options().confTimeout;
     
-    task1 = runFetch();
+    task1 = runFetch(pickBackend());
     io::wait(task1, std::min(retransmit, timeout));
         
-    if (!task1.succeeded() && !serverIdxs.empty() && retransmit.finite()) {
-        DEBUG(1) << "Retransmitting config request to another server";
-        task2 = runFetch();
-        io::wait_any(task1, task2, timeout);
-        if (task1.failed() && !task2.completed())
-            io::wait(task2, timeout);
+    if (!task1.succeeded() && retransmit.finite()) {
+        Connection c2 = pickBackend();
+        if (c2.exists()) {
+            DEBUG(1) << "Retransmitting config request to another server";
+            task2 = runFetch(std::move(c2));
+            io::wait_any(task1, task2, timeout);
+            if (task1.failed() && !task2.completed())
+                io::wait(task2, timeout);
+        }
     } else {
         io::wait(task1, timeout);
     }
@@ -479,18 +472,9 @@ ConfigHolder::ConfigHolder(const std::string& connstr):
 {
     if (connstr.empty())
         throw std::runtime_error("connection string for config servers cannot be empty");
-    
-    std::vector<std::string> servers;
-    size_t pos = 0;
-    for (size_t comma; (comma = connstr.find(',', pos)) != std::string::npos; pos = comma + 1)
-        servers.push_back(connstr.substr(pos, comma - pos));
-    servers.push_back(connstr.substr(pos));
-    
-    for (const std::string& server: servers)
-        servers_.emplace_back(new Backend(0, server));
 
     configShard_ = ShardPool::instance().get("config", connstr_);
-    
+
     bson::Object cache = g_cache->get("shard_config");
     if (!cache.empty()) {
         INFO() << "Using shard config cache";

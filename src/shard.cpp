@@ -364,6 +364,10 @@ public:
             auto i = info.find(backend.get());
             if (!backend->alive() || !isHealthy(backend.get())) {
                 ret.merge(monitoring::Status::warning(backend->addr() + " is dead"));
+            } else if (!backend->permanentErrmsg().empty()) {
+                ret.merge(monitoring::Status::critical(
+                    backend->addr() + " is permanently half-alive: " + backend->permanentErrmsg()
+                ));
             } else if (i == info.end() || i->second.optime < optimeThreshold) {
                 ret.merge(monitoring::Status::warning(backend->addr() + "'s replication lag exceeds threshold"));
             } else {

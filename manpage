@@ -20,7 +20,7 @@ is just fine. This option may be specified more than once if you need
 to accept connections on different address families or interfaces.
 
 .TP
-.BR \-c ", " \-\-config\-servers =\fIHOST\fR:\fIPORT\fR[,\fIHOST\fR:\fIPORT\fR,...]
+.BR \-c ", " \-\-config\-servers =[\fIreplset\fR/]\fIHOST\fR:\fIPORT\fR[,\fIHOST\fR:\fIPORT\fR,...]
 Use the specified config server. Please note that you must use the same
 config server set listed \fIin the same order\fR and the same notation for all mongoz
 and mongos instances within the whole shard set (e.g. "localhost:27019",
@@ -30,6 +30,9 @@ different config servers, incompatible with each other).
 Warning: due to internal MongoDB limitations, mismatched config servers
 in two different mongoz/mongos instances will likely \fBrender the whole
 cluster unusable\fR.
+
+When using version 3.2 (or later) of the backends, using a replica set
+for holding configs is a preferred option.
 
 .TP
 .BR \-C ", " \-\-config\-cache =\fIFILE\fR

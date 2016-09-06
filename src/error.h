@@ -59,6 +59,7 @@ DEFINE_ERROR(CursorNotFound,       BackendClientError);
 DEFINE_ERROR(QueryFailure,         BackendClientError);
 DEFINE_ERROR(ShardConfigStale,     BackendClientError);
 DEFINE_ERROR(NotMaster,            BackendClientError);
+DEFINE_ERROR(PermanentFailure,     BackendClientError);
 
 DEFINE_ERROR(NoSuitableBackend,    Error);
 
