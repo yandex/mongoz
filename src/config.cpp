@@ -421,8 +421,10 @@ bson::Object ConfigHolder::fetchConfig()
     
     auto pickBackend = [this, &exclude]() -> Connection {
         Connection c = configShard_->readOp(QUERY_FLAGS, READ_PREFERENCE, exclude);
-        DEBUG(2) << "Using config server " << c.backend().addr();
-        exclude = &c.backend();
+        if (c.exists()) {
+            DEBUG(2) << "Using config server " << c.backend().addr();
+            exclude = &c.backend();
+        }
         return c;
     };
 
@@ -439,7 +441,11 @@ bson::Object ConfigHolder::fetchConfig()
     io::timeout retransmit = options().confRetransmit;
     io::timeout timeout = options().confTimeout;
     
-    task1 = runFetch(pickBackend());
+    Connection c = pickBackend();
+    if (!c.exists())
+        throw errors::BackendInternalError("no config servers available yet");
+    
+    task1 = runFetch(std::move(c));
     io::wait(task1, std::min(retransmit, timeout));
         
     if (!task1.succeeded() && retransmit.finite()) {
