@@ -329,6 +329,8 @@ void Backend::endpointAlive(Endpoint* pt, bson::Object status)
     
     if (shard_)
         shard_->backendUpdated(this);
+
+    pinged_ = true;
 }
 
 void Backend::endpointDead(Endpoint* pt)
@@ -343,6 +345,8 @@ void Backend::endpointDead(Endpoint* pt)
         if (shard_)
             shard_->backendUpdated(this);
     }
+    
+    pinged_ = true;
 }
 
 Endpoint* Backend::calcNearest() const

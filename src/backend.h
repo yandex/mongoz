@@ -118,7 +118,7 @@ public:
     
     /// Endpoint status.
     std::chrono::microseconds roundtrip() const { return roundtrip_; }
-    bool alive() const { return roundtrip() != std::chrono::microseconds::max(); }
+    bool alive() const { return !pinged_ || roundtrip() != std::chrono::microseconds::max(); }
     bool wasAlive() const { return prevRoundtrip_ != std::chrono::microseconds::max(); }
     
     
@@ -171,7 +171,8 @@ class Backend {
 public:
     explicit Backend(Shard* shard, const std::string& addr):
         shard_(shard), addr_(addr),
-        nearest_([this]{ return calcNearest(); })
+        nearest_([this]{ return calcNearest(); }),
+        pinged_(false)
     {
         for (const io::addr& a: io::resolve(addr))
             endpts_.emplace_back(new Endpoint(this, a));
@@ -193,7 +194,7 @@ public:
     }
 
     std::chrono::microseconds roundtrip() const { return nearest_.get().value()->roundtrip(); }
-    bool alive() const { return !status().empty() && nearest_.get().value()->alive(); }
+    bool alive() const { return !pinged_ || (!status().empty() && nearest_.get().value()->alive()); }
     
     Endpoint* endpoint() const { return nearest_.get().value(); }
     
@@ -238,6 +239,7 @@ private:
     std::vector<EndptPtr> endpts_;
     Lazy<Endpoint*> nearest_;
     std::string permanentErrmsg_;
+    bool pinged_;
     mutable io::sys::shared_mutex mutex_;
     
     void endpointAlive(Endpoint* pt, bson::Object status);
