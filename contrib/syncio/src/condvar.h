@@ -1,5 +1,5 @@
 /**
- * syncio.h -- a main header file including all neccessary headers
+ * condvar.h -- syncio based condition variable
  *
  * This file is part of mongoz, a more sound implementation
  * of mongodb sharding server.
@@ -27,13 +27,42 @@
 
 #pragma once
 
-#include "error.h"
-#include "time.h"
-#include "addr.h"
-#include "fd.h"
-#include "stream.h"
-#include "task.h"
-#include "engine.h"
-#include "algorithm.h"
-#include "mutex.h"
-#include "condvar.h"
+#include <syncio/condvar.h>
+#include "wait.h"
+#include "scheduler.h"
+
+namespace io { namespace impl {
+
+class CondVar
+{
+public:
+    void notifyOne() { queue_.scheduleOne(); }
+
+    void notifyAll() { queue_.scheduleAll(); }
+
+    std::cv_status wait(std::unique_lock<mutex>& lock, timeout timeout)
+    {
+        WaitQueue::Lock queueLock(queue_);
+        Scheduler* s = Scheduler::current();
+        Coroutine* c = s->currentCoroutine();
+
+        int result = s->stepDownCurrent([this, &queueLock, &lock, c]{
+            queue_.push(c);
+            queueLock.unlock();
+            lock.unlock();
+        }, [&queueLock, &lock]{
+            lock.lock();
+            queueLock.lock();
+        }, timeout);
+
+        if (result == -ETIMEDOUT) {
+            return std::cv_status::timeout;
+        }
+        return std::cv_status::no_timeout;
+    }
+
+private:
+    WaitQueue queue_;
+};
+
+}} // namespace io::impl

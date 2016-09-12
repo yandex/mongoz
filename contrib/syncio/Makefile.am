@@ -8,6 +8,8 @@ endif
 lib_LTLIBRARIES = libsyncio.la
 libsyncio_la_SOURCES = \
     src/addr.cpp \
+    src/condvar.cpp \
+    src/condvar.h \
     src/ctx.cpp \
     src/ctx.h \
     src/ctx_x86_64.s \
@@ -32,12 +34,13 @@ libsyncio_la_SOURCES = \
     src/wait.cpp \
     src/wait.h
 libsyncio_la_LIBADD = -lrt
-libsyncio_la_LDFLAGS = -version-info 1:0:1
+libsyncio_la_LDFLAGS = -version-info 2:1:2
 
 hdrdir = $(includedir)/syncio
 hdr_HEADERS = \
     include/syncio/addr.h \
     include/syncio/algorithm.h \
+    include/syncio/condvar.h \
     include/syncio/debug.h \
     include/syncio/engine.h \
     include/syncio/error.h \
@@ -55,8 +58,8 @@ impl_HEADERS = \
     include/syncio/impl/future.h \
     include/syncio/impl/utility.h
 
-check_PROGRAMS = smoke smoke-http stack-overflow
-TESTS = smoke smoke-http stack-overflow
+check_PROGRAMS = smoke smoke-http stack-overflow test-condvar
+TESTS = smoke smoke-http stack-overflow test-condvar
 
 smoke_SOURCES = tests/smoke.cpp
 smoke_CXXFLAGS = ${AM_CXXFLAGS} -pthread
@@ -67,3 +70,6 @@ smoke_http_LDADD = libsyncio.la
 
 stack_overflow_SOURCES = tests/stack-overflow.cpp
 stack_overflow_LDADD = libsyncio.la
+
+test_condvar_SOURCES = tests/test-condvar.cpp
+test_condvar_LDADD = libsyncio.la

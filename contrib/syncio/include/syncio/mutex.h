@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <atomic>
 #include <cassert>
