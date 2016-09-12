@@ -68,6 +68,7 @@ Stack::Stack(size_t size): ptr_(nullptr), size_(size)
 
     if (mprotect(p, pageSize(), PROT_NONE)) {
         int err = errno;
+        munmap(p, size_ + pageSize());
         throw std::runtime_error(std::string("stack mprotect: ") + strerror(err));
     }
 

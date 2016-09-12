@@ -40,7 +40,9 @@ TaskBase::~TaskBase()
         cancel();
         Coroutine* current = Scheduler::current()->currentCoroutine();
         current->disableCancellation(); // cannot throw anything out of a destructor
-        io::wait(*this);
+        while (!completed()) { // can be awakened by cancel()
+            io::wait(*this);
+        }
         current->enableCancellation();
     }
     detach();
