@@ -73,7 +73,7 @@ public:
     const io::fd* fd() const; // For logging and debugging purposes
 
 protected:
-    int overflow(int c) override;
+    int overflow(int c = traits_type::eof()) override;
     int underflow() override;
     int sync() override;
     std::streamsize xsgetn(char* buf, std::streamsize size) override;

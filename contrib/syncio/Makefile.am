@@ -34,7 +34,7 @@ libsyncio_la_SOURCES = \
     src/wait.cpp \
     src/wait.h
 libsyncio_la_LIBADD = -lrt
-libsyncio_la_LDFLAGS = -version-info 2:2:2
+libsyncio_la_LDFLAGS = -version-info 2:3:2
 
 hdrdir = $(includedir)/syncio
 hdr_HEADERS = \

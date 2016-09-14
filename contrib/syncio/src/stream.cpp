@@ -38,7 +38,7 @@ namespace io {
 namespace {
 class BackendImpl: public stream::backend {
 public:
-    explicit BackendImpl(io::fd fd): fd_(std::move(fd)) {}
+    explicit BackendImpl(io::fd&& fd): fd_(std::move(fd)) {}
     ssize_t read(void* data, size_t size) override { return fd_.read(data, size); }
     ssize_t write(const void* data, size_t size) override { return fd_.write(data, size); }
     const io::fd* fd() const override { return &fd_; }
@@ -48,13 +48,13 @@ private:
 } // namespace
 
 struct streambuf::Impl {
-    static const size_t BUFSIZE = 2048;
+    static const size_t BUFSIZE = 32768;
     
     std::unique_ptr<stream::backend> backend;
     std::vector<char> rdbuf;
     std::vector<char> wrbuf;
     
-    Impl(std::unique_ptr<stream::backend> be): backend(std::move(be)) {}
+    Impl(std::unique_ptr<stream::backend>&& be): backend(std::move(be)) {}
     Impl(io::fd&& fd): backend(new BackendImpl(std::move(fd))) {}
 };
 
@@ -71,12 +71,16 @@ int streambuf::overflow(int c)
         ret = impl_->backend->write(&impl_->wrbuf[0], pptr() - &impl_->wrbuf[0]);
     }
 
-    char* begin = &impl_->wrbuf[0];
-    if (c != traits_type::eof())
-        *begin++ = (char) c;
+    if (ret > 0) {
+        char* begin = &impl_->wrbuf[0];
+        if (c != traits_type::eof())
+            *begin++ = (char) c;
 
-    setp(begin, &impl_->wrbuf.back() + 1);
-    return (ret <= 0) ? traits_type::eof() : 0;
+        setp(begin, &impl_->wrbuf.back() + 1);
+        return 0;
+    } else {
+        return traits_type::eof();
+    }
 }
 
 int streambuf::underflow()
@@ -96,12 +100,9 @@ int streambuf::underflow()
 
 int streambuf::sync()
 {
-    if (impl_->wrbuf.empty() || pptr() == &impl_->wrbuf[0])
+    if (impl_->wrbuf.empty())
         return 0;
-
-    size_t ret = impl_->backend->write(&impl_->wrbuf[0], pptr() - &impl_->wrbuf[0]);
-    setp(&impl_->wrbuf.front(), &impl_->wrbuf.back() + 1);
-    return (ret > 0) ? 0 : EOF;
+    return (overflow() == traits_type::eof()) ? traits_type::eof() : 0;
 }
 
 std::streamsize streambuf::xsgetn(char* buf, std::streamsize size) { return std::streambuf::xsgetn(buf, size); }
