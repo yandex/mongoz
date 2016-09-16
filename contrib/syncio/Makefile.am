@@ -58,8 +58,8 @@ impl_HEADERS = \
     include/syncio/impl/future.h \
     include/syncio/impl/utility.h
 
-check_PROGRAMS = smoke smoke-http stack-overflow test-condvar dblcancel
-TESTS = smoke smoke-http stack-overflow test-condvar dblcancel
+check_PROGRAMS = smoke smoke-http test-condvar dblcancel
+TESTS = smoke smoke-http test-condvar dblcancel
 
 smoke_SOURCES = tests/smoke.cpp
 smoke_CXXFLAGS = ${AM_CXXFLAGS} -pthread
@@ -68,11 +68,15 @@ smoke_LDADD = libsyncio.la
 smoke_http_SOURCES = tests/smoke-http.cpp
 smoke_http_LDADD = libsyncio.la
 
-stack_overflow_SOURCES = tests/stack-overflow.cpp
-stack_overflow_LDADD = libsyncio.la
-
 test_condvar_SOURCES = tests/test-condvar.cpp
 test_condvar_LDADD = libsyncio.la
 
 dblcancel_SOURCES = tests/dblcancel.cpp
 dblcancel_LDADD = libsyncio.la
+
+if ENABLE_DEBUG
+check_PROGRAMS += stack-overflow
+TESTS += stack-overflow
+stack_overflow_SOURCES = tests/stack-overflow.cpp
+stack_overflow_LDADD = libsyncio.la
+endif

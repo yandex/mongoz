@@ -34,6 +34,10 @@
 #include <string.h>
 #include <unistd.h>
 
+namespace io { namespace impl {
+
+#ifdef IO_DEBUG
+
 namespace {
 
 size_t pageSize()
@@ -45,7 +49,35 @@ size_t pageSize()
 
 } // namespace
 
-namespace io { namespace impl {
+void* allocateStack(size_t size)
+{
+    void* p = mmap(nullptr, size + pageSize(),
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
+        /*fd =*/-1, /*offset =*/0);
+    if (p == MAP_FAILED)
+        return 0;
+
+    if (mprotect(p, pageSize(), PROT_NONE)) {
+        int err = errno;
+        munmap(p, size + pageSize());
+        throw std::runtime_error(std::string("stack mprotect: ") + strerror(err));
+    }
+
+    return static_cast<char*>(p) + pageSize();    
+}
+
+void freeStack(void* ptr, size_t size)
+{
+    munmap(static_cast<char*>(ptr) - pageSize(), size + pageSize());
+}
+
+#else
+
+void* allocateStack(size_t size) { return malloc(size); }
+void freeStack(void* ptr, size_t /*size*/) { free(ptr); }
+
+#endif
 
 extern "C" {
     size_t __io_ctx_size();
@@ -59,28 +91,17 @@ Stack::Stack(size_t size): ptr_(nullptr), size_(size)
     if (size_ < sizeof(void(*)(void*)))
         throw std::invalid_argument("requested stack size is too small");
 
-    void* p = mmap(nullptr, size_ + pageSize(),
-        PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
-        /*fd =*/-1, /*offset =*/0);
-    if (p == MAP_FAILED)
+    ptr_ = allocateStack(size_);
+    if (!ptr_)
         throw std::bad_alloc();
-
-    if (mprotect(p, pageSize(), PROT_NONE)) {
-        int err = errno;
-        munmap(p, size_ + pageSize());
-        throw std::runtime_error(std::string("stack mprotect: ") + strerror(err));
-    }
-
-    ptr_ = static_cast<char*>(p) + pageSize();
-
+    
     IFVALGRIND( valgrindId_ = VALGRIND_STACK_REGISTER(ptr_, (char*) ptr_ + size_) );
 }
 
 Stack::~Stack()
 {
     IFVALGRIND( VALGRIND_STACK_DEREGISTER(valgrindId_) );
-    munmap(static_cast<char*>(ptr_) - pageSize(), size_ + pageSize());
+    freeStack(ptr_, size_);
 }
 
 size_t defaultStackSize() { return 65536; }
