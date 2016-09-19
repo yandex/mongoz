@@ -97,6 +97,7 @@ mongoz_CXXFLAGS += -DIO_DEBUG -DIO_DEBUG_CIRCULAR
 endif
 
 if CPUPROFILE
+mongoz_CXXFLAGS += -DCPUPROFILE
 mongoz_LDFLAGS += -lprofiler
 endif
 
