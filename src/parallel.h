@@ -62,6 +62,8 @@ public:
             }
         }
     }
+
+    bool empty() const { return tasks_.empty(); }
     
 private:
     std::vector<io::impl::TaskBase*> tasks_;

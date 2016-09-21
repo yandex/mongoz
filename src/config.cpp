@@ -30,6 +30,7 @@
 #include "shard.h"
 #include "options.h"
 #include "cache.h"
+#include "parallel.h"
 #include <set>
 #include <syncio/syncio.h>
 #include <bson/bson11.h>
@@ -386,7 +387,7 @@ bson::Array readTable(io::stream& s, const Namespace& ns, Conditions&&... condit
     s << QueryComposer(ns, bson::object(
         "query", bson::object(std::forward<Conditions>(conditions)...),
         "$orderby", bson::object("_id", 1)
-    )) << std::flush;
+    )).slaveOK() << std::flush;
     while (uint64_t cursorID = readReply(s, 0, [&ret](const bson::Object& obj) { ret << obj; })) {
         MsgBuilder b;
         b << (uint32_t) 0 << (uint32_t) 0 << Opcode::GET_MORE
@@ -445,32 +446,35 @@ bson::Object ConfigHolder::fetchConfig()
     if (!c.exists())
         throw errors::BackendInternalError("no config servers available yet");
     
+    TaskPool<bson::Object> pool;
+    
     task1 = runFetch(std::move(c));
-    io::wait(task1, std::min(retransmit, timeout));
-        
-    if (!task1.succeeded() && retransmit.finite()) {
+    pool.add(task1);
+    
+    io::task<bson::Object>* t = pool.wait(std::min(retransmit, timeout));
+    if ((!t || !t->succeeded()) && retransmit.finite()) {
         Connection c2 = pickBackend();
         if (c2.exists()) {
             DEBUG(1) << "Retransmitting config request to another server";
             task2 = runFetch(std::move(c2));
-            io::wait_any(task1, task2, timeout);
-            if (task1.failed() && !task2.completed())
-                io::wait(task2, timeout);
+            pool.add(task2);
         }
-    } else {
-        io::wait(task1, timeout);
     }
     
-    bson::Object cfg;
-    if (!task1.empty() && task1.completed())
-        cfg = task1.get();
-    else if (!task2.empty() && task2.completed())
-        cfg = task2.get();
-    else
-        throw errors::BackendInternalError("cannot communicate with config servers");
-    
-    DEBUG(3) << "Read config: " << cfg;
-    return cfg;
+    while (!pool.empty()) {
+        t = pool.wait(timeout);
+        if (t && t->succeeded()) {
+            bson::Object cfg = t->get();
+            DEBUG(3) << "Read config: " << cfg;
+            return cfg;
+        }
+    }
+
+    if (t) {
+        return t->get(); // will throw
+    } else {
+        throw io::error("timeout while reading configs");
+    }
 }
 
 ConfigHolder::ConfigHolder(const std::string& connstr):

@@ -198,7 +198,9 @@ public:
         Multiple(RS_PING_QUERIES, addrs), name_(std::move(name)),
         primary_([this]{ return calcPrimary(); }),
         lostPrimarySince_(SteadyClock::now())
-    {}    
+    {
+        pingNow();
+    }
     
     Connection readOp(uint32_t queryFlags, const bson::Object& readPref, Backend* exclude) override
     {
