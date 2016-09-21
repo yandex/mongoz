@@ -255,7 +255,7 @@ std::shared_ptr<CredentialsCache::Map> CredentialsCache::parse(bson::Object obj)
                 : db.name();
             
             auto i = ret->insert(std::make_pair(std::make_pair(dbname, user["user"].as<std::string>()), user.as<bson::Object>()));
-            if (!i.second && db.name() == "admin")
+            if (!i.second && db.name() == std::string("admin"))
                 i.first->second = user.as<bson::Object>();
         }
     return ret;

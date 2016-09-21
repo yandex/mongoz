@@ -51,6 +51,7 @@ public:
     {
         level_ = std::max(level_, other.level_);
         msgs_.insert(msgs_.end(), other.msgs_.begin(), other.msgs_.end());
+        return *this;
     }
     
 private:

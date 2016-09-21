@@ -333,7 +333,7 @@ struct Delete: public Base<DeleteSub> {
         uint32_t zero;
         uint32_t flags;
         
-        subops.push_back({});
+        subops.push_back( DeleteSub {{}, 0} );
         Subop& d = subops.back();
         if (!(msg >> zero >> ns >> flags >> d.selector))
             throw std::runtime_error("bad delete message");
