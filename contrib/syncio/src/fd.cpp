@@ -52,10 +52,10 @@ namespace io {
 fd::fd(int fd): fd_(fd)
 {
     if (fd != -1) {
-        dirs_ = impl::Directions::get(fd);
+        dirs_ = impl::Poller::current().getDirections(fd);
         dirs_->read.reset(fd);
         dirs_->write.reset(fd);
-        impl::Poller::current().add(fd_, dirs_);
+        impl::Poller::current().add(dirs_);
     } else {
         dirs_ = 0;
     }

@@ -33,9 +33,9 @@ namespace impl {
 
 #ifdef IO_DEBUG
 
-Log g_log;
+Log* g_log = new Log;
 
-Log& Log::instance() { return g_log; }
+Log& Log::instance() { return *g_log; }
 
 void LogMessage::putHeader(std::ostream& s, const char* ident)
 {

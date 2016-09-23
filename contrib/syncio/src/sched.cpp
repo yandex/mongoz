@@ -129,8 +129,7 @@ void Coroutine::cleanup(void* pc)
         c->stack_.reset(0);
         c->deref();
     };
-    static const std::function<void()> EMPTY;
-    c->sched_->stepDownCurrent(c->cleanup_.stepDown, /*stepIn = */ EMPTY);
+    c->sched_->stepDownCurrent(c->cleanup_.stepDown, c->finish_);
     assert(!"should never reach here");
 }
 

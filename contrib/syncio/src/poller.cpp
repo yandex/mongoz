@@ -59,16 +59,14 @@ void Direction::wakeup()
     waiting_.scheduleAll();
 }
 
-Directions* Directions::get(int fd)
+
+Directions* Poller::getDirections(int fd)
 {
-    static std::mutex mutex;
-    static std::vector< std::unique_ptr<Directions> > v;
-    
-    std::unique_lock<decltype(mutex)> lock(mutex);
-    
-    if (v.size() <= (unsigned) fd)
-        v.resize(fd + 1);
-    std::unique_ptr<Directions>& d = v[fd];
+    std::unique_lock<decltype(dirsMutex_)> lock(dirsMutex_);
+
+    while (dirs_.size() <= (unsigned) fd)
+        dirs_.emplace_back();
+    std::unique_ptr<Directions>& d = dirs_[fd];
     if (!d.get())
         d.reset(new Directions);
     return d.get();
@@ -114,8 +112,11 @@ Poller::~Poller()
     ::close(pipeWr_);
 }
 
-void Poller::add(int fd, Directions* dirs)
+void Poller::add(Directions* dirs)
 {
+    assert(dirs->read.fd() == dirs->write.fd());
+    int fd = dirs->read.fd();
+    
     LOG_IO("adding fd " << fd << " to poller " << this);
     struct epoll_event evt;
     evt.events = EPOLLIN | EPOLLOUT | EPOLLET;

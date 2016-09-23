@@ -56,8 +56,6 @@ private:
 struct Directions {
     Direction read;
     Direction write;
-    
-    static Directions* get(int fd);
 };
 
 class Poller {
@@ -67,15 +65,20 @@ public:
     
     static Poller& current();
     
-    void add(int fd, Directions* dirs);
+    void add(Directions* dirs);
     void remove(int fd);
     void wait(timeout timeout);
     void wakeup();
+    
+    Directions* getDirections(int fd) /*mutable*/;
     
 private:
     int fd_;
     int pipeRd_;
     int pipeWr_;
+    
+    std::mutex dirsMutex_;
+    std::vector< std::unique_ptr<Directions> > dirs_;
 };
 
 }} // namespace io::impl

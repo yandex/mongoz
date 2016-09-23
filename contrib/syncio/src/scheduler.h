@@ -86,6 +86,7 @@ private:
     bool completed_ = false;
     Scheduler* sched_;
     std::function<void()> start_;
+    const std::function<void()> finish_;
     std::unique_ptr<Stack> stack_;
     Context ctx_;
     std::mutex mutex_;
