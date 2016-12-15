@@ -559,6 +559,7 @@ public:
     QueryComposer& flags(uint32_t x) { flags_ = x; return *this; }
     QueryComposer& skip(int32_t x) { skip_ = x; return *this; }
     QueryComposer& batchSize(int32_t x) { batchSize_ = x; return *this; }
+    QueryComposer& fieldSelector(bson::Object x) { fieldSelector_ = std::move(x); return *this; }
     
     QueryComposer& slaveOK() { flags_ |= 0x04; return *this; }
     QueryComposer& exhaust() { flags_ |= 0x40; return *this; }
@@ -579,6 +580,7 @@ private:
     int32_t skip_ = 0;
     int32_t batchSize_ = 0;
     bson::Object query_;
+    bson::Object fieldSelector_;
     
     MsgBuilder msg() const
     {
@@ -588,6 +590,9 @@ private:
         b << msgid_ << (uint32_t) 0 << Opcode::QUERY
           << flags_ << ns_.ns() << skip_ << batchSize
           << query_;
+        if (!fieldSelector_.empty()) {
+            b << fieldSelector_;
+        }
         return b;
     }
 };

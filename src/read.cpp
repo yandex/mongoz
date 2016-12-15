@@ -81,6 +81,7 @@ std::vector<char> BackendDatasource::makeQuery(uint32_t reqID)
     q.msgID(reqID);
     q.skip(pos());
     q.batchSize(msg_.nToReturn == 1 ? 1 : 0);
+    q.fieldSelector(msg_.fieldSelector);
     
     if (
         msg_.readPreference()["mode"].as<std::string>("primary") != "primary"
