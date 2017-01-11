@@ -349,7 +349,7 @@ inline Ret readOp(
     std::function<Ret(std::vector<Config::VersionedShard>)> multi
 ){
     std::exception_ptr ex;
-    for (size_t attempt = 0; attempt != 8; ++attempt) {
+    for (size_t attempt = 0; attempt != 3; ++attempt) {
         try {            
             std::shared_ptr<Config> config = g_config->get();
             std::vector<Config::VersionedShard> shards = config->find(ns, criteria);

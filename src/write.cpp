@@ -691,7 +691,7 @@ std::unique_ptr<WriteOperation> performWriteOp(const Msg& msg, const auth::Privi
     checkPrivileges(msg.ns, privileges);
     
     std::exception_ptr ex;
-    for (int attempt = 0; attempt != 8; ++attempt) {
+    for (int attempt = 0; attempt != 3; ++attempt) {
         try {
             DEBUG(2) << "Making up the write operation";
             std::shared_ptr<Config> config = g_config->get();
