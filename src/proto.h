@@ -29,6 +29,7 @@
 
 #include "error.h"
 #include "log.h"
+#include "utility.h"
 #include <vector>
 #include <stdexcept>
 #include <stdint.h>
@@ -615,8 +616,9 @@ uint64_t readReply(io::stream& s, uint32_t msgid, OnDoc onDoc)
     uint32_t msglen;
     
     auto bail = [&s](const std::string& msg) {
-        DEBUG(1) << "error communicating with backend " << s.fd()->getpeername() << msg;
-        throw errors::BackendInternalError(msg);
+        std::string peer = toString(s.fd()->getpeername());
+        DEBUG(1) << "error communicating with backend " << peer << msg;
+        throw errors::BackendInternalError("error communicating with " + peer + msg);
     };
     
     if (!s.read(reinterpret_cast<char*>(&msglen), sizeof(msglen)))

@@ -205,7 +205,7 @@ void WriteToBackend::perform()
         }
     }
     
-    throw errors::NoSuitableBackend("cannot communicate with backend");
+    throw errors::NoSuitableBackend("cannot communicate with primary for shard " + vs_.shard->connectionString());
 }
 
 void WriteToBackend::finish()

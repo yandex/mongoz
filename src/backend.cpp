@@ -33,6 +33,7 @@
 #include "config.h"
 #include "options.h"
 #include "auth.h"
+#include "utility.h"
 #include <bson/bson11.h>
 #include <cassert>
 
@@ -65,8 +66,12 @@ void Connection::establish(const Namespace& ns, const ChunkVersion& v, const cha
         trySetVersion(ns, v);
     stream().write(msg, msglen).flush();
     
-    if (!stream())
-        throw io::error("cannot communicate with backend");
+    if (!stream()) {
+        throw io::error(
+            "cannot communicate with " + backend().addr()
+            + " (" + toString(endpoint().addr()) + ")"
+        );
+    }
 }
 
 void Connection::stepDown(std::chrono::seconds duration)
@@ -97,7 +102,7 @@ void Connection::authenticate()
     bson::Object ret = readReply(stream(), 0);
     DEBUG(3) << "Received nonce: " << ret;
     if (!cmdOk(ret))
-        throw errors::BackendInternalError(ret["err"].as<std::string>("unknown error"));
+        throw errors::BackendInternalError(backend().addr(), ret["err"].as<std::string>("unknown error"));
     
     std::string nonce = ret["nonce"].as<std::string>();
     
@@ -111,7 +116,7 @@ void Connection::authenticate()
     DEBUG(3) << "Received reply: " << ret;
     
     if (!cmdOk(ret))
-        throw errors::BackendInternalError(ret["errmsg"].as<std::string>("unknown error"));
+        throw errors::BackendInternalError(backend().addr(), ret["errmsg"].as<std::string>("unknown error"));
     
     impl_->authenticated = true;
 }
@@ -159,9 +164,11 @@ void Connection::trySetVersion(const Namespace& ns, const ChunkVersion& v)
             ERROR() << backend().addr() << " permanently incapable of operating as master";
             backend().permanentlyFailed(errmsg);
             stepDown(3600_s);
-            throw errors::PermanentFailure(errmsg);
+            throw errors::PermanentFailure(backend().addr(), errmsg);
+        } else if (errmsg.find("None of the hosts for replica set") != std::string::npos) {
+            throw errors::ConnectivityError(backend().addr(), errmsg);
         } else {
-            throw errors::ShardConfigStale(errmsg);
+            throw errors::ShardConfigStale(backend().addr(), errmsg);
         }
     }
 }

@@ -30,22 +30,36 @@
 #include <stdexcept>
 #include <string>
 
-#define DEFINE_ERROR(klass, base) \
-    class klass: public base { \
-    public: \
-        klass(): base(#klass) {} \
-        klass(const std::string& what): base(what) {} \
-    }
-
 namespace errors {
 
 /// A base class of all errors.
 /// Everything thrown which is not a subclass of Error
 /// must be carefully logged and investigated.
-DEFINE_ERROR(Error, std::runtime_error);
+class Error: public std::runtime_error {
+public:
+    Error(): std::runtime_error("Error") {}
+    explicit Error(const std::string& errmsg): std::runtime_error(errmsg) {}
+    Error(const std::string& reporter, const std::string& errmsg):
+        std::runtime_error("``" + errmsg + "'' (reported by " + reporter + ")") {}
+};
 
 /// Error in internal logic
-DEFINE_ERROR(AssertionFailed, std::runtime_error);
+/// (deliberately not a subclass of Error)
+class AssertionFailed: public std::runtime_error {
+public:
+    explicit AssertionFailed(const std::string& errmsg): std::runtime_error(errmsg) {}
+};
+
+
+#define DEFINE_ERROR(klass, base) \
+    class klass: public base { \
+    public: \
+        klass(): base(#klass) {} \
+        klass(std::string errmsg): base(std::move(errmsg)) {} \
+        klass(std::string reporter, std::string errmsg): \
+            base(std::move(reporter), std::move(errmsg)) \
+        {} \
+    }
 
 /// Backend behaved the way it was not expected to
 /// (broken messages, unexpecped replies, etc...)
@@ -60,6 +74,7 @@ DEFINE_ERROR(QueryFailure,         BackendClientError);
 DEFINE_ERROR(ShardConfigStale,     BackendClientError);
 DEFINE_ERROR(NotMaster,            BackendClientError);
 DEFINE_ERROR(PermanentFailure,     BackendClientError);
+DEFINE_ERROR(ConnectivityError,    BackendClientError);
 
 DEFINE_ERROR(NoSuitableBackend,    Error);
 
